@@ -5,7 +5,7 @@ on:
     inputs:
       api_level:
         description: 'Android API level (Android 16 is API 36)'
-        required: true
+        required: false
         default: '36'
         type: string
       device_codename:
@@ -14,11 +14,11 @@ on:
         type: string
       device_name:
         description: 'Full device name (for release description, e.g., "Redmi Note 11T Pro")'
-        required: true
+        required: false
         type: string
       version_name:
         description: 'ROM/firmware version identifier'
-        required: true
+        required: false
         type: string
       framework_url:
         description: 'URL to framework.jar (required for: signature_verification, kaorios_toolbox)'
@@ -45,6 +45,22 @@ on:
         required: false
         type: string
         default: 'disable_signature_verification'
+      settings_source:
+        description: 'Use workflow inputs or config/android16.json for device settings'
+        required: true
+        type: choice
+        options:
+          - workflow_inputs
+          - repository_config
+        default: workflow_inputs
+      jar_source:
+        description: 'Download JARs from URLs or use repository-local JARs'
+        required: true
+        type: choice
+        options:
+          - download_urls
+          - repository_jars
+        default: download_urls
 
 jobs:
   patch:
@@ -79,7 +95,65 @@ jobs:
           fi
           echo "✅ apktool.jar verified"
 
+      - name: Resolve patch settings
+        id: patch_settings
+        env:
+          SETTINGS_SOURCE: ${{ inputs.settings_source }}
+          API_LEVEL_INPUT: ${{ inputs.api_level }}
+          DEVICE_CODENAME_INPUT: ${{ inputs.device_codename }}
+          DEVICE_NAME_INPUT: ${{ inputs.device_name }}
+          VERSION_NAME_INPUT: ${{ inputs.version_name }}
+          FEATURES_INPUT: ${{ inputs.features }}
+        run: |
+          if [ "$SETTINGS_SOURCE" = "repository_config" ]; then
+            CONFIG_FILE="config/android16.json"
+            if [ ! -f "$CONFIG_FILE" ]; then
+              echo "❌ Local settings file not found: $CONFIG_FILE"
+              exit 1
+            fi
+            python3 - "$CONFIG_FILE" "$GITHUB_OUTPUT" <<'PY'
+          import json
+          import sys
+
+          config_path, output_path = sys.argv[1:]
+          with open(config_path, encoding="utf-8") as config_file:
+              settings = json.load(config_file)
+
+          required = ("api_level", "device_name", "version_name", "features")
+          for key in required:
+              value = settings.get(key)
+              if not isinstance(value, str) or not value.strip():
+                  raise SystemExit(f"❌ {key} must be a non-empty string in {config_path}")
+
+          settings.setdefault("device_codename", "")
+          if not isinstance(settings["device_codename"], str):
+              raise SystemExit(f"❌ device_codename must be a string in {config_path}")
+
+          with open(output_path, "a", encoding="utf-8") as output_file:
+              for key in (*required, "device_codename"):
+                  value = settings[key]
+                  if "\n" in value or "\r" in value:
+                      raise SystemExit(f"❌ {key} must be a single-line value in {config_path}")
+                  output_file.write(f"{key}={value}\n")
+          PY
+          else
+            if [ -z "$API_LEVEL_INPUT" ] || [ -z "$DEVICE_NAME_INPUT" ] || [ -z "$VERSION_NAME_INPUT" ]; then
+              echo "❌ api_level, device_name, and version_name are required when using workflow_inputs."
+              exit 1
+            fi
+            {
+              echo "api_level=$API_LEVEL_INPUT"
+              echo "device_codename=$DEVICE_CODENAME_INPUT"
+              echo "device_name=$DEVICE_NAME_INPUT"
+              echo "version_name=$VERSION_NAME_INPUT"
+              echo "features=${FEATURES_INPUT:-disable_signature_verification}"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Download framework JARs
+        env:
+          FEATURES: ${{ steps.patch_settings.outputs.features }}
+          JAR_SOURCE: ${{ inputs.jar_source }}
         run: |
           # Smart download function that handles Google Drive links
           download_file() {
@@ -104,7 +178,6 @@ jobs:
           }
           
           # Determine which JARs are needed based on features
-          FEATURES="${{ github.event.inputs.features }}"
           NEED_FRAMEWORK=0
           NEED_SERVICES=0
           NEED_MIUI_SERVICES=0
@@ -147,37 +220,70 @@ jobs:
           echo "  miui-framework.jar: $([ $NEED_MIUI_FRAMEWORK -eq 1 ] && echo 'REQUIRED' || echo 'not needed')"
           echo "============================================"
           
-          # Download required JARs
+          # Load or download required JARs
+          SOURCE_DIR="Sources/android16/china"
           if [ $NEED_FRAMEWORK -eq 1 ]; then
-            if [ -z "${{ github.event.inputs.framework_url }}" ]; then
-              echo "❌ framework.jar URL is required but not provided!"
-              exit 1
+            if [ "$JAR_SOURCE" = "repository_jars" ]; then
+              if [ ! -f "$SOURCE_DIR/framework.jar" ]; then
+                echo "❌ Local JAR not found: $SOURCE_DIR/framework.jar"
+                exit 1
+              fi
+              cp "$SOURCE_DIR/framework.jar" framework.jar
+            else
+              if [ -z "${{ github.event.inputs.framework_url }}" ]; then
+                echo "❌ framework.jar URL is required but not provided!"
+                exit 1
+              fi
+              download_file "${{ github.event.inputs.framework_url }}" "framework.jar"
             fi
-            download_file "${{ github.event.inputs.framework_url }}" "framework.jar"
           fi
           
           if [ $NEED_SERVICES -eq 1 ]; then
-            if [ -z "${{ github.event.inputs.services_url }}" ]; then
-              echo "❌ services.jar URL is required but not provided!"
-              exit 1
+            if [ "$JAR_SOURCE" = "repository_jars" ]; then
+              if [ ! -f "$SOURCE_DIR/services.jar" ]; then
+                echo "❌ Local JAR not found: $SOURCE_DIR/services.jar"
+                exit 1
+              fi
+              cp "$SOURCE_DIR/services.jar" services.jar
+            else
+              if [ -z "${{ github.event.inputs.services_url }}" ]; then
+                echo "❌ services.jar URL is required but not provided!"
+                exit 1
+              fi
+              download_file "${{ github.event.inputs.services_url }}" "services.jar"
             fi
-            download_file "${{ github.event.inputs.services_url }}" "services.jar"
           fi
           
           if [ $NEED_MIUI_SERVICES -eq 1 ]; then
-            if [ -z "${{ github.event.inputs.miui_services_url }}" ]; then
-              echo "❌ miui-services.jar URL is required but not provided!"
-              exit 1
+            if [ "$JAR_SOURCE" = "repository_jars" ]; then
+              if [ ! -f "$SOURCE_DIR/miui-services.jar" ]; then
+                echo "❌ Local JAR not found: $SOURCE_DIR/miui-services.jar"
+                exit 1
+              fi
+              cp "$SOURCE_DIR/miui-services.jar" miui-services.jar
+            else
+              if [ -z "${{ github.event.inputs.miui_services_url }}" ]; then
+                echo "❌ miui-services.jar URL is required but not provided!"
+                exit 1
+              fi
+              download_file "${{ github.event.inputs.miui_services_url }}" "miui-services.jar"
             fi
-            download_file "${{ github.event.inputs.miui_services_url }}" "miui-services.jar"
           fi
           
           if [ $NEED_MIUI_FRAMEWORK -eq 1 ]; then
-            if [ -z "${{ github.event.inputs.miui_framework_url }}" ]; then
-              echo "❌ miui-framework.jar URL is required but not provided!"
-              exit 1
+            if [ "$JAR_SOURCE" = "repository_jars" ]; then
+              if [ ! -f "$SOURCE_DIR/miui-framework.jar" ]; then
+                echo "❌ Local JAR not found: $SOURCE_DIR/miui-framework.jar"
+                exit 1
+              fi
+              cp "$SOURCE_DIR/miui-framework.jar" miui-framework.jar
+            else
+              if [ -z "${{ github.event.inputs.miui_framework_url }}" ]; then
+                echo "❌ miui-framework.jar URL is required but not provided!"
+                exit 1
+              fi
+              download_file "${{ github.event.inputs.miui_framework_url }}" "miui-framework.jar"
             fi
-            download_file "${{ github.event.inputs.miui_framework_url }}" "miui-framework.jar"
           fi
           
           echo "Validating downloaded JAR files..."
@@ -199,16 +305,23 @@ jobs:
 
       - name: Set safe device codename
         id: set_codename
+        env:
+          DEVICE_CODENAME: ${{ steps.patch_settings.outputs.device_codename }}
+          DEVICE_NAME: ${{ steps.patch_settings.outputs.device_name }}
         run: |
-          RAW_CODENAME="${{ github.event.inputs.device_codename }}"
+          RAW_CODENAME="$DEVICE_CODENAME"
           if [ -z "$RAW_CODENAME" ]; then
-            RAW_CODENAME="${{ github.event.inputs.device_name }}"
+            RAW_CODENAME="$DEVICE_NAME"
           fi
           # Sanitize: Remove spaces and other invalid tag characters
           SAFE_CODENAME=$(echo "$RAW_CODENAME" | sed 's/[^a-zA-Z0-9._-]/_/g')
           echo "codename=${SAFE_CODENAME}" >> $GITHUB_OUTPUT
 
       - name: Run Android 16 patcher
+        env:
+          FEATURES: ${{ steps.patch_settings.outputs.features }}
+          API_LEVEL: ${{ steps.patch_settings.outputs.api_level }}
+          VERSION_NAME: ${{ steps.patch_settings.outputs.version_name }}
         run: |
           LOG_FILE="build_log_android16.txt"
           : > "$LOG_FILE"
@@ -219,19 +332,19 @@ jobs:
           
           # Build feature flags
           FEATURE_FLAGS=""
-          if [[ "${{ github.event.inputs.features }}" == *disable_signature_verification* ]]; then
+          if [[ "$FEATURES" == *disable_signature_verification* ]]; then
             FEATURE_FLAGS="$FEATURE_FLAGS --disable-signature-verification"
           fi
-          if [[ "${{ github.event.inputs.features }}" == *cn_notification_fix* ]]; then
+          if [[ "$FEATURES" == *cn_notification_fix* ]]; then
             FEATURE_FLAGS="$FEATURE_FLAGS --cn-notification-fix"
           fi
-          if [[ "${{ github.event.inputs.features }}" == *disable_secure_flag* ]]; then
+          if [[ "$FEATURES" == *disable_secure_flag* ]]; then
             FEATURE_FLAGS="$FEATURE_FLAGS --disable-secure-flag"
           fi
-          if [[ "${{ github.event.inputs.features }}" == *kaorios_toolbox* ]]; then
+          if [[ "$FEATURES" == *kaorios_toolbox* ]]; then
             FEATURE_FLAGS="$FEATURE_FLAGS --kaorios-toolbox"
           fi
-          if [[ "${{ github.event.inputs.features }}" == *add_gboard* ]]; then
+          if [[ "$FEATURES" == *add_gboard* ]]; then
             FEATURE_FLAGS="$FEATURE_FLAGS --add-gboard"
           fi
           
@@ -263,9 +376,9 @@ jobs:
           export WORKFLOW_RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/build-tmp-${{ github.run_id }}"
 
           ./scripts/patcher_a16.sh \
-            "${{ github.event.inputs.api_level }}" \
+            "$API_LEVEL" \
             "${{ steps.set_codename.outputs.codename }}" \
-            "${{ github.event.inputs.version_name }}" \
+            "$VERSION_NAME" \
             $JAR_FLAGS $FEATURE_FLAGS
 
       - name: Verify module creation
@@ -286,7 +399,7 @@ jobs:
         id: release_info
         run: |
           RELEASE_TAG="build-tmp-${{ github.run_id }}"
-          RELEASE_NAME="Android 16 | ${{ steps.set_codename.outputs.codename }} | ${{ github.event.inputs.version_name }}"
+          RELEASE_NAME="Android 16 | ${{ steps.set_codename.outputs.codename }} | ${{ steps.patch_settings.outputs.version_name }}"
           echo "tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
           echo "name=${RELEASE_NAME}" >> $GITHUB_OUTPUT
 
@@ -340,22 +453,28 @@ jobs:
 
       - name: Generate Release Body
         id: generate_release_body
+        env:
+          FEATURES: ${{ steps.patch_settings.outputs.features }}
+          DEVICE_NAME: ${{ steps.patch_settings.outputs.device_name }}
+          VERSION_NAME: ${{ steps.patch_settings.outputs.version_name }}
+          API_LEVEL: ${{ steps.patch_settings.outputs.api_level }}
+          JAR_SOURCE: ${{ inputs.jar_source }}
         run: |
           # Build features list
           FEATURES_LIST=()
-          if [[ "${{ github.event.inputs.features }}" == *disable_signature_verification* ]]; then
+          if [[ "$FEATURES" == *disable_signature_verification* ]]; then
             FEATURES_LIST+=("- Signature Verification Bypass")
           fi
-          if [[ "${{ github.event.inputs.features }}" == *cn_notification_fix* ]]; then
+          if [[ "$FEATURES" == *cn_notification_fix* ]]; then
             FEATURES_LIST+=("- CN Notification Fix")
           fi
-          if [[ "${{ github.event.inputs.features }}" == *disable_secure_flag* ]]; then
+          if [[ "$FEATURES" == *disable_secure_flag* ]]; then
             FEATURES_LIST+=("- Disable Secure Flag")
           fi
-          if [[ "${{ github.event.inputs.features }}" == *kaorios_toolbox* ]]; then
+          if [[ "$FEATURES" == *kaorios_toolbox* ]]; then
             FEATURES_LIST+=("- Kaorios Toolbox (Play Integrity Fix) ")
           fi
-          if [[ "${{ github.event.inputs.features }}" == *add_gboard* ]]; then
+          if [[ "$FEATURES" == *add_gboard* ]]; then
             FEATURES_LIST+=("- Add Gboard Support")
           fi
 
@@ -367,13 +486,13 @@ jobs:
           
           # Create release body
           cat > /tmp/release_body.md << RELEASE_EOF
-          Android 16 Framework Patcher for ${{ github.event.inputs.device_name }}
+          Android 16 Framework Patcher for $DEVICE_NAME
           
-          Device: ${{ github.event.inputs.device_name }}
-          Version: ${{ github.event.inputs.version_name }}
-          Android API: ${{ github.event.inputs.api_level }}
+          Device: $DEVICE_NAME
+          Version: $VERSION_NAME
+          Android API: $API_LEVEL
           
-          Important: This module is built specifically for ${{ github.event.inputs.device_name }} running ${{ github.event.inputs.version_name }}. Installing on other devices or ROM versions may cause boot loops or system issues.
+          Important: This module is built specifically for $DEVICE_NAME running $VERSION_NAME. Installing on other devices or ROM versions may cause boot loops or system issues.
           
           Compatible with Magisk, KernelSU, and SUFS
           
@@ -381,9 +500,7 @@ jobs:
           FEATURES_PLACEHOLDER
           
           Source files:
-          - Framework: ${{ github.event.inputs.framework_url }}
-          - Services: ${{ github.event.inputs.services_url }}
-          - MIUI Services: ${{ github.event.inputs.miui_services_url }}
+          - JAR source mode: $JAR_SOURCE
           
           Built: $(date +'%Y-%m-%d %H:%M:%S UTC')
           Workflow: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -464,15 +581,19 @@ jobs:
 
       - name: Send Telegram Notification (Success)
         if: success() && github.event.inputs.user_id != ''
+        env:
+          DEVICE_NAME: ${{ steps.patch_settings.outputs.device_name }}
+          VERSION_NAME: ${{ steps.patch_settings.outputs.version_name }}
+          API_LEVEL: ${{ steps.patch_settings.outputs.api_level }}
         run: |
           escape_mdv2() {
             echo "$1" | sed -e 's/\\/\\\\/g' -e 's/\./\\./g' -e 's/\-/\\-/g' -e 's/!/\\!/g' -e 's/#/\\#/g' -e 's/{/\\{/g' -e 's/}/\\}/g' -e 's/(/\\(/g' -e 's/)/\\)/g'
           }
 
           DEVICE_CODENAME_ESCAPED=$(escape_mdv2 "${{ steps.set_codename.outputs.codename }}")
-          DEVICE_NAME_ESCAPED=$(escape_mdv2 "${{ github.event.inputs.device_name }}")
-          VERSION_NAME_ESCAPED=$(escape_mdv2 "${{ github.event.inputs.version_name }}")
-          API_LEVEL_ESCAPED=$(escape_mdv2 "${{ github.event.inputs.api_level }}")
+          DEVICE_NAME_ESCAPED=$(escape_mdv2 "$DEVICE_NAME")
+          VERSION_NAME_ESCAPED=$(escape_mdv2 "$VERSION_NAME")
+          API_LEVEL_ESCAPED=$(escape_mdv2 "$API_LEVEL")
 
           MESSAGE=$(printf "Android 16 framework patch is ready for your device:\n\n> *Device:* \`%s\`\n> *Codename:* \`%s\`\n> *Version:* \`%s\`\n> *Android API:* \`%s\`\n\nModule compatible with Magisk, KSU, and SUFS" \
             "$DEVICE_NAME_ESCAPED" \
@@ -492,6 +613,10 @@ jobs:
 
       - name: Send Telegram Notification (Failure)
         if: failure() && github.event.inputs.user_id != ''
+        env:
+          DEVICE_CODENAME_INPUT: ${{ steps.patch_settings.outputs.device_codename }}
+          DEVICE_NAME: ${{ steps.patch_settings.outputs.device_name }}
+          VERSION_NAME: ${{ steps.patch_settings.outputs.version_name }}
         run: |
           escape_mdv2() {
             echo "$1" | sed -e 's/\\/\\\\/g' -e 's/\./\\./g' -e 's/\-/\\-/g' -e 's/!/\\!/g' -e 's/#/\\#/g' -e 's/{/\\{/g' -e 's/}/\\}/g' -e 's/(/\\(/g' -e 's/)/\\)/g'
@@ -499,12 +624,12 @@ jobs:
 
           DEVICE_CODENAME="${{ steps.set_codename.outputs.codename }}"
           if [ -z "$DEVICE_CODENAME" ]; then
-            DEVICE_CODENAME="${{ github.event.inputs.device_codename }}"
+            DEVICE_CODENAME="$DEVICE_CODENAME_INPUT"
           fi
 
           DEVICE_CODENAME_ESCAPED=$(escape_mdv2 "$DEVICE_CODENAME")
-          DEVICE_NAME_ESCAPED=$(escape_mdv2 "${{ github.event.inputs.device_name }}")
-          VERSION_NAME_ESCAPED=$(escape_mdv2 "${{ github.event.inputs.version_name }}")
+          DEVICE_NAME_ESCAPED=$(escape_mdv2 "$DEVICE_NAME")
+          VERSION_NAME_ESCAPED=$(escape_mdv2 "$VERSION_NAME")
           WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
           MESSAGE=$(printf "Android 16 framework patch failed for your device:\n\n> *Device:* \`%s\`\n> *Codename:* \`%s\`\n> *Version:* \`%s\`\n\nCheckout logs below\." \
@@ -525,9 +650,9 @@ jobs:
             LOG_FILE="failure_summary_android16.txt"
             {
               echo "Build log file was not generated."
-              echo "Device: ${{ github.event.inputs.device_name }}"
+              echo "Device: $DEVICE_NAME"
               echo "Codename: $DEVICE_CODENAME"
-              echo "Version: ${{ github.event.inputs.version_name }}"
+              echo "Version: $VERSION_NAME"
               echo "Workflow run: $WORKFLOW_URL"
               echo "Please open the workflow URL for full runner logs."
             } > "$LOG_FILE"

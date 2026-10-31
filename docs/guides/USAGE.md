@@ -123,7 +123,7 @@ Select which patches to apply:
 
 ### Workflow Inputs
 
-#### Required Parameters
+#### Default URL-Based Inputs (Android 15 and Android 16)
 
 - **api_level**: Android API level (35 or 36)
 - **device_name**: Device codename for naming
@@ -138,6 +138,13 @@ Select which patches to apply:
 - **enable_signature_bypass**: Enable signature verification bypass (default: true)
 - **enable_cn_notification_fix**: Enable CN notification fix (default: false)
 - **enable_disable_secure_flag**: Enable secure flag bypass (default: false)
+
+#### Android 16 Local Sources
+
+The Android 16 workflow has independent source selectors:
+
+- **settings_source**: Choose `workflow_inputs` or `repository_config`. The local config is `config/android16.json`; fill in its API level, device name, ROM version, and features before selecting it.
+- **jar_source**: Choose `download_urls` or `repository_jars`. Local JARs are read from `Sources/android16/china/` and must use the names `framework.jar`, `services.jar`, `miui-services.jar`, and `miui-framework.jar`. Only JARs required by the selected features need to be present.
 
 ### Example Configuration
 
@@ -709,4 +716,3 @@ Keep track of which features you've used:
 ---
 
 For more detailed information, see the feature-specific guides in the `docs/` directory.
-

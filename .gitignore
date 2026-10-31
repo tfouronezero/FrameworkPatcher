@@ -106,8 +106,8 @@ test_*.jar
 dummy_*.jar
 
 # Large files (except tools)
-*.jar
 !tools/apktool.jar
+!Sources/android16/local_jar/*.jar
 
 # Session files
 *.session
