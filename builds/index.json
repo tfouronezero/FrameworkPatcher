@@ -4,16 +4,16 @@
     "spark": {
       "OS3.0.305.0.WHYMIXM": {
         "android_version": "16",
-        "build_time": "2026-10-31T04:09:16Z",
+        "build_time": "2026-10-31T04:21:17Z",
         "patch_version": "3.0.0",
-        "release_url": "https://github.com/tfouronezero/FrameworkPatcher/releases/tag/build-tmp-41167207847",
-        "workflow_url": "https://github.com/tfouronezero/FrameworkPatcher/actions/runs/41167207847",
+        "release_url": "https://github.com/tfouronezero/FrameworkPatcher/releases/tag/build-tmp-41168085188",
+        "workflow_url": "https://github.com/tfouronezero/FrameworkPatcher/actions/runs/41168085188",
         "features": [
           "disable_signature_verification"
         ]
       }
     }
   },
-  "last_updated": "2026-10-31T04:10:04Z",
+  "last_updated": "2026-10-31T04:22:17Z",
   "engine_version": "3.0.0"
 }

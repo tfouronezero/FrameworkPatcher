@@ -7,18 +7,18 @@
       "features": [
         "disable_signature_verification"
       ],
-      "build_time": "2026-10-31T04:09:16Z",
-      "git_commit": "6a25c28",
+      "build_time": "2026-10-31T04:21:17Z",
+      "git_commit": "f6eef38",
       "checksums": {
-        "framework_patched.jar": "sha256:740e141ede6059dd5e4083c6bfb4d1d95c4af36739632e2798cb9e8d9ac086de",
-        "services_patched.jar": "sha256:7bb77d0eff4d70b956f83dabc9d0e5879771406c463af63ae0a61468fe4f684d",
-        "miui-services_patched.jar": "sha256:0e83838c561f53d9df60cb14084a2c28083a9a69026aadc8e3a1b764a8afc082",
-        "module_zip": "sha256:c86609d8e33e3fc05ecb4e3047ed2c7dc53c0feab7eebf2476c390a98f4402d2"
+        "framework_patched.jar": "sha256:648b827210e9fc23b50e8b6f91e0afe599236bd240567097cdd24ddf7b0dcb1a",
+        "services_patched.jar": "sha256:115f0ab802c825720bac7a627b01d22c778ee979e79db9d65d64cedfd35a3b19",
+        "miui-services_patched.jar": "sha256:9dabe00d1cf1da6f79d1dd26362abf7024620e975b82dbfa5b1aaee903f48267",
+        "module_zip": "sha256:80190b8e8e53e454fc05a91aefcc8fa48f275bc8ec29985284eb3d171ff7290e"
       },
-      "workflow_run_id": "41167207847",
-      "workflow_url": "https://github.com/tfouronezero/FrameworkPatcher/actions/runs/41167207847",
-      "release_url": "https://github.com/tfouronezero/FrameworkPatcher/releases/tag/build-tmp-41167207847"
+      "workflow_run_id": "41168085188",
+      "workflow_url": "https://github.com/tfouronezero/FrameworkPatcher/actions/runs/41168085188",
+      "release_url": "https://github.com/tfouronezero/FrameworkPatcher/releases/tag/build-tmp-41168085188"
     }
   },
-  "last_updated": "2026-10-31T04:10:04Z"
+  "last_updated": "2026-10-31T04:22:17Z"
 }
