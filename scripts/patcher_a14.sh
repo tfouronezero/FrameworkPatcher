@@ -119,7 +119,7 @@ apply_framework_signature_patches() {
     # Patch verifySignatures - find and patch invoke-interface result
     echo "Patching verifySignatures..."
     local file
-    file=$(find "$decompile_dir" -type f -name "*.smali" -print0 | xargs -0 grep -l "invoke-interface.*ParseResult;->isError()Z" 2>/dev/null | head -n 1)
+    file=$(find_smali_file_matching "$decompile_dir" "invoke-interface.*ParseResult;->isError()Z") || return $?
     if [ -f "$file" ]; then
         local pattern="invoke-interface {v0}, Landroid/content/pm/parsing/result/ParseResult;->isError()Z"
         local linenos
@@ -144,7 +144,7 @@ ${indent}const/4 v1, 0x0" "$file"
 
     # Patch verifyV1Signature
     echo "Patching verifyV1Signature..."
-    file=$(find "$decompile_dir" -type f -name "*.smali" -print0 | xargs -0 grep -l "verifyV1Signature.*ParseInput.*Ljava/lang/String;Z" 2>/dev/null | head -n 1)
+    file=$(find_smali_file_matching "$decompile_dir" "verifyV1Signature.*ParseInput.*Ljava/lang/String;Z") || return $?
     if [ -f "$file" ]; then
         local pattern="invoke-static.*verifyV1Signature"
         local lineno
@@ -158,7 +158,7 @@ ${indent}const/4 v1, 0x0" "$file"
 
     # Patch verifyV2Signature
     echo "Patching verifyV2Signature..."
-    file=$(find "$decompile_dir" -type f -name "*.smali" -print0 | xargs -0 grep -l "verifyV2Signature.*ParseInput.*Ljava/lang/String;Z" 2>/dev/null | head -n 1)
+    file=$(find_smali_file_matching "$decompile_dir" "verifyV2Signature.*ParseInput.*Ljava/lang/String;Z") || return $?
     if [ -f "$file" ]; then
         local pattern="invoke-static.*verifyV2Signature"
         local lineno
@@ -172,7 +172,7 @@ ${indent}const/4 v1, 0x0" "$file"
 
     # Patch verifyV3Signature
     echo "Patching verifyV3Signature..."
-    file=$(find "$decompile_dir" -type f -name "*.smali" -print0 | xargs -0 grep -l "verifyV3Signature.*ParseInput.*Ljava/lang/String;Z" 2>/dev/null | head -n 1)
+    file=$(find_smali_file_matching "$decompile_dir" "verifyV3Signature.*ParseInput.*Ljava/lang/String;Z") || return $?
     if [ -f "$file" ]; then
         local pattern="invoke-static.*verifyV3Signature"
         local lineno
@@ -186,7 +186,7 @@ ${indent}const/4 v1, 0x0" "$file"
 
     # Patch verifyV3AndBelowSignatures
     echo "Patching verifyV3AndBelowSignatures..."
-    file=$(find "$decompile_dir" -type f -name "*.smali" -print0 | xargs -0 grep -l "verifyV3AndBelowSignatures.*ParseInput.*Ljava/lang/String;IZ" 2>/dev/null | head -n 1)
+    file=$(find_smali_file_matching "$decompile_dir" "verifyV3AndBelowSignatures.*ParseInput.*Ljava/lang/String;IZ") || return $?
     if [ -f "$file" ]; then
         local pattern="invoke-static.*verifyV3AndBelowSignatures"
         local lineno
@@ -310,7 +310,7 @@ apply_services_signature_patches() {
     # Patch isPersistent check
     echo "Patching isPersistent check..."
     local file
-    file=$(find "$decompile_dir" -type f -name "*.smali" -print0 | xargs -0 grep -l "invoke-interface.*isPersistent()Z" 2>/dev/null | head -n 1)
+    file=$(find_smali_file_matching "$decompile_dir" "invoke-interface.*isPersistent()Z") || return $?
     if [ -f "$file" ]; then
         local pattern="invoke-interface {v4}, Lcom/android/server/pm/pkg/AndroidPackage;->isPersistent()Z"
         local linenos

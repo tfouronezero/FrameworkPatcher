@@ -660,7 +660,7 @@ apply_framework_signature_patches() {
     fi
 
     local hidden_api_file
-    hidden_api_file=$(find "$decompile_dir" -type f -name "*.smali" -print0 | xargs -0 grep -l "isAllowedToUseHiddenApis" 2>/dev/null | head -n1)
+    hidden_api_file=$(find_smali_file_matching "$decompile_dir" "isAllowedToUseHiddenApis") || return $?
     if [ -n "$hidden_api_file" ]; then
         log "Patching isAllowedToUseHiddenApis to return true..."
         force_methods_return_const "$hidden_api_file" "isAllowedToUseHiddenApis" "1"

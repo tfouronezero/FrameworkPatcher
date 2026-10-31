@@ -2,10 +2,31 @@
 # scripts/core/patching.sh
 # Smali patching functions
 
+find_smali_file_matching() {
+    local decompile_dir="$1"
+    local pattern="$2"
+    local matches
+    local search_status=0
+
+    matches=$(grep -r -l --include="*.smali" -- "$pattern" "$decompile_dir" 2>/dev/null) || search_status=$?
+    case "$search_status" in
+        0)
+            printf '%s\n' "$matches" | sed -n '1p'
+            ;;
+        1)
+            return 0
+            ;;
+        *)
+            err "Failed to search for pattern '${pattern}' in $decompile_dir (status $search_status)"
+            return "$search_status"
+            ;;
+    esac
+}
+
 find_smali_method_file() {
     local decompile_dir="$1"
     local method="$2"
-    grep -r -l --include="*.smali" "[[:space:]]*\.method.*${method}" "$decompile_dir" 2>/dev/null | head -n1
+    find_smali_file_matching "$decompile_dir" "[[:space:]]*\.method.*${method}"
 }
 
 add_static_return_patch() {

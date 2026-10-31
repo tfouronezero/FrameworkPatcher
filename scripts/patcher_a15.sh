@@ -154,7 +154,7 @@ add_static_return_patch() {
     local file
 
     # Simple working approach from old script
-    file=$(find "$decompile_dir" -type f -name "*.smali" -print0 | xargs -0 grep -l ".method.* $method" 2>/dev/null | head -n 1)
+    file=$(find_smali_file_matching "$decompile_dir" ".method.* $method") || return $?
 
     [ -z "$file" ] && return
 
@@ -216,7 +216,7 @@ patch_return_void_method() {
     local file
 
     # Simple working approach from old script
-    file=$(find "$decompile_dir" -type f -name "*.smali" -print0 | xargs -0 grep -l ".method.* $method" 2>/dev/null | head -n 1)
+    file=$(find_smali_file_matching "$decompile_dir" ".method.* $method") || return $?
     [ -z "$file" ] && {
         echo "Method $method not found"
         return
@@ -392,7 +392,7 @@ ${indent}const/4 v4, 0x0" "$file"
     # Patch invoke unsafeGetCertsWithoutVerification
     echo "Patching invoke-static call for unsafeGetCertsWithoutVerification..."
     local file
-    file=$(find "$decompile_dir" -type f -name "*.smali" -print0 | xargs -0 grep -l "ApkSignatureVerifier;->unsafeGetCertsWithoutVerification" 2>/dev/null | head -n 1)
+    file=$(find_smali_file_matching "$decompile_dir" "ApkSignatureVerifier;->unsafeGetCertsWithoutVerification") || return $?
     if [ -f "$file" ]; then
         local pattern="ApkSignatureVerifier;->unsafeGetCertsWithoutVerification"
         local line_numbers
