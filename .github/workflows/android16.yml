@@ -415,6 +415,29 @@ jobs:
           
           echo "file_path=${ZIP_FILE}" >> $GITHUB_OUTPUT
 
+      - name: Find patched JARs
+        id: find_patched_jars
+        run: |
+          PATCHED_JARS=()
+          for jar in framework_patched.jar services_patched.jar miui-services_patched.jar miui-framework_patched.jar; do
+            if [ -f "$jar" ]; then
+              PATCHED_JARS+=("$jar")
+            fi
+          done
+
+          if [ ${#PATCHED_JARS[@]} -eq 0 ]; then
+            echo "❌ No patched JARs were created."
+            exit 1
+          fi
+
+          echo "Patched JARs to attach to release:"
+          printf '  %s\n' "${PATCHED_JARS[@]}"
+          {
+            echo "files<<EOF"
+            printf '%s\n' "${PATCHED_JARS[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Delete Existing Release
         uses: actions/github-script@v6
         continue-on-error: true
@@ -535,6 +558,7 @@ jobs:
           tag_name: ${{ steps.release_info.outputs.tag }}
           name: ${{ steps.release_info.outputs.name }}
           files: |
+            ${{ steps.find_patched_jars.outputs.files }}
             ${{ steps.find_zip.outputs.file_path }}
             build-manifest.json
           body: |
