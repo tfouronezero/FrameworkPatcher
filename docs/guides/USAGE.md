@@ -39,7 +39,8 @@ Select which JAR files to patch:
 
 Select which patches to apply:
 
-- `--disable-signature-verification` - Bypass signature checks
+- `--disable-signature-verification` - Bypass signature checks. On Android 15 and 16, this also patches the
+  `isAllowedToUseHiddenApis` method in `framework.jar` to return `true`.
 - `--cn-notification-fix` - Fix notification delays
 - `--disable-secure-flag` - Allow screenshots/recordings
 - (Default: signature verification only)

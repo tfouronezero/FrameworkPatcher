@@ -413,6 +413,9 @@ ${indent}const/4 v4, 0x0" "$file"
         echo "Smali file containing the target line not found"
     fi
 
+    echo "Patching isAllowedToUseHiddenApis to return true..."
+    add_static_return_patch "isAllowedToUseHiddenApis" 1 "$decompile_dir"
+
     # Patch ApkSigningBlockUtils isEqual
     echo "Patching ApkSigningBlockUtils isEqual check..."
     local file

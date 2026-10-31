@@ -659,6 +659,15 @@ apply_framework_signature_patches() {
         warn "SigningDetails.smali not found"
     fi
 
+    local hidden_api_file
+    hidden_api_file=$(find "$decompile_dir" -type f -name "*.smali" -print0 | xargs -0 grep -l "isAllowedToUseHiddenApis" 2>/dev/null | head -n1)
+    if [ -n "$hidden_api_file" ]; then
+        log "Patching isAllowedToUseHiddenApis to return true..."
+        force_methods_return_const "$hidden_api_file" "isAllowedToUseHiddenApis" "1"
+    else
+        warn "isAllowedToUseHiddenApis not found"
+    fi
+
     local apk_sig_scheme_v2_file
     apk_sig_scheme_v2_file=$(find "$decompile_dir" -type f -path "*/android/util/apk/ApkSignatureSchemeV2Verifier.smali" | head -n1)
     if [ -n "$apk_sig_scheme_v2_file" ]; then
